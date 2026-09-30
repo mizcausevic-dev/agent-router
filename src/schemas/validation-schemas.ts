@@ -7,8 +7,8 @@ const CapabilityEnum = z.enum([
 
 export const RoutingRequestSchema = z.object({
   requiredCapabilities: z.array(CapabilityEnum).min(1),
-  estimatedInputTokens: z.number().int().min(0),
-  estimatedOutputTokens: z.number().int().min(0),
+  estimatedInputTokens: z.number().int().min(0).max(10_000_000),
+  estimatedOutputTokens: z.number().int().min(0).max(10_000_000),
   optimization: z.enum(['quality', 'cost', 'latency', 'balanced']),
   excludeModelIds: z.array(z.string()).optional(),
   excludeProviders: z.array(z.string()).optional(),
@@ -29,7 +29,6 @@ export const CircuitOutcomeSchema = z.object({
   ok: z.boolean(),
   latencyMs: z.number().min(0).optional(),
   errorCode: z.string().optional(),
-  at: z.number().int().min(0).optional(), // defaults to Date.now() if absent
 });
 
 const RoutingDecisionSchema = z.object({
@@ -47,5 +46,5 @@ const RoutingDecisionSchema = z.object({
 });
 
 export const TelemetrySummarySchema = z.object({
-  decisions: z.array(RoutingDecisionSchema).min(1),
+  decisions: z.array(RoutingDecisionSchema).min(1).max(1000),
 });

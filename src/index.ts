@@ -1,8 +1,8 @@
 import express from 'express';
 import helmet from 'helmet';
-import cors from 'cors';
 import morgan from 'morgan';
-import { env } from './config/env';
+import path from 'node:path';
+import { assertLocalDemoMode, env } from './config/env';
 import {
   modelsRouter,
   routeRouter,
@@ -11,11 +11,12 @@ import {
   dashboardRouter,
 } from './routes/index';
 
+assertLocalDemoMode();
+
 export const app = express();
 const startedAt = Date.now();
 
 app.use(helmet());
-app.use(cors());
 app.use(morgan('tiny'));
 app.use(express.json({ limit: '8mb' }));
 
@@ -33,12 +34,12 @@ app.use('/api/route', routeRouter);
 app.use('/api/breakers', breakersRouter);
 app.use('/api/telemetry', telemetryRouter);
 app.use('/api/dashboard', dashboardRouter);
+if (env.nodeEnv !== 'production') app.use('/demo', express.static(path.join(__dirname, '..', 'dashboard-preview')));
 
 app.use((_req, res) => { res.status(404).json({ error: 'Not found' }); });
 
 if (require.main === module) {
-  app.listen(env.port, () => {
-    // eslint-disable-next-line no-console
-    console.log(`agent-router listening on :${env.port}`);
+  app.listen(env.port, '127.0.0.1', () => {
+    console.log(`agent-router demo listening on 127.0.0.1:${env.port}`);
   });
 }

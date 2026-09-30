@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { assertLocalDemoMode } from '../config/env';
 import {
   RoutingRequestSchema,
   RouteWithFallbackSchema,
@@ -9,8 +10,11 @@ import { MODEL_REGISTRY, findBackend } from '../governance/model-registry';
 import { scoreRoutes } from '../governance/route-scorer';
 import { buildFallbackChain } from '../governance/fallback-chain';
 import { CircuitBreakerRegistry } from '../governance/circuit-breaker';
+import { recordKnownModelOutcome } from '../governance/record-outcome';
 import { summarizeTelemetry } from '../governance/telemetry';
 import { ROUTING_DECISIONS } from '../data/decisions';
+
+assertLocalDemoMode();
 
 // Process-wide circuit breaker registry. In production this would be a
 // shared store backed by Redis/etc; in-memory is fine for the demo router.
@@ -70,18 +74,18 @@ breakersRouter.get('/', (_req, res) => {
 breakersRouter.post('/outcome', (req, res) => {
   const parsed = CircuitOutcomeSchema.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: 'Invalid payload', details: parsed.error.issues }); return; }
-  const at = parsed.data.at ?? Date.now();
-  const state = breakers.recordOutcome({
+  const state = recordKnownModelOutcome(breakers, {
     modelId: parsed.data.modelId,
     ok: parsed.data.ok,
     latencyMs: parsed.data.latencyMs,
     errorCode: parsed.data.errorCode,
-    at,
   });
+  if (state === null) { res.status(404).json({ error: 'model-not-found' }); return; }
   res.json({ modelId: parsed.data.modelId, state });
 });
 
 breakersRouter.delete('/:modelId', (req, res) => {
+  if (!findBackend(req.params.modelId)) { res.status(404).json({ error: 'model-not-found' }); return; }
   breakers.reset(req.params.modelId);
   res.json({ modelId: req.params.modelId, reset: true });
 });

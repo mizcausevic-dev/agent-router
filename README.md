@@ -5,39 +5,23 @@
 [![TypeScript](https://img.shields.io/badge/typescript-5.6-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![License: MIT](https://img.shields.io/badge/license-MIT-66FCF1)](LICENSE)
 
-Multi-model routing layer for LLM workloads. Capability-aware routing, cost/latency optimization, fallback chains with cross-provider diversity, circuit breakers, sticky-session tenancy, and live routing telemetry.
+Local routing decision simulator for LLM workloads. It scores a seeded model catalog, builds fallback order, and tracks a process-local circuit breaker.
 
-> Recruiter takeaway:
->
-> *"This person built the actual production routing layer most teams hand-roll badly. Capability-aware filtering, four optimization strategies (quality/cost/latency/balanced), proper circuit breakers with half-open semantics, and cross-provider failover. This is the thing that decides which LLM your traffic actually hits at runtime."*
+**Release boundary:** no provider dispatch, real traffic telemetry, sticky sessions, authentication, or tenant isolation exists. The demo binds to `127.0.0.1`; `NODE_ENV=production` refuses to initialize, including when an adapter imports its app or route module. Do not route production prompts through it.
 
 ## Why This Exists
 
-Every AI team that ships at scale eventually builds a routing layer — it always starts as `if/else` matching prompt to model, evolves into a Slack channel of "Anthropic is down, switch to OpenAI," and ends as a tangled production fire. The routing layer is doing too many jobs: capability matching, cost optimization, latency caps, circuit breaking, fallback ordering, telemetry. Most teams build half of these and call it a day.
+Model selection can combine capability matching, cost, latency, breaker state, and fallback order. This repository keeps those decisions inspectable with seeded inputs.
 
-This repo is the version where all of those concerns are first-class, testable, and composable. Capability filter → score against optimization preference → check circuit-breaker availability → build cross-provider fallback chain → emit telemetry. The routing decision becomes a contract, not a prayer.
+This repo isolates the decision logic: capability filter → score against an optimization preference → check process-local breaker availability → build a fallback chain. Telemetry endpoints summarize seeded or caller-supplied decisions; `/api/route/decide` does not emit a new telemetry record.
 
-## Where This Sits in the Portfolio
-
-| Repo | Surface | Question it answers |
-|---|---|---|
-| [`mcp-sentinel`](https://github.com/mizcausevic-dev/mcp-sentinel) | Tool calls | What MCP tools are exposed and how risky? |
-| [`rag-sentinel`](https://github.com/mizcausevic-dev/rag-sentinel) | Retrieval | What's in the vector store and how trustworthy? |
-| [`agent-codex`](https://github.com/mizcausevic-dev/agent-codex) | Decisions | Under what policies are decisions allowed? |
-| [`agent-eval-arena`](https://github.com/mizcausevic-dev/agent-eval-arena) | Pre-prod | Should this model promotion ship? |
-| **`agent-router`** | **Runtime routing** | ***Which model does this request actually hit?*** |
-| [`agentobserve`](https://github.com/mizcausevic-dev/agentobserve) | Runtime | What did agents actually do? |
-| [`shadow-ai-detector`](https://github.com/mizcausevic-dev/shadow-ai-detector) | Egress | Who's leaking what to whom? |
-| [`ai-finops-radar`](https://github.com/mizcausevic-dev/ai-finops-radar) | Finance | Are we on budget — and why not? |
-| [`kinetic-flightdeck`](https://github.com/mizcausevic-dev/kinetic-flightdeck) | Operator | Are we OK right now? |
-
-This is the only repo in the portfolio that's **actively serving requests** — everything else reports, evaluates, or governs. This decides.
+This reference implementation returns a routing recommendation only. A provider proxy, authorization boundary, and real outcome ingestion remain future work.
 
 ## Five Capabilities
 
 ### 1. Model Registry
 
-Catalog of 12 backends across Anthropic, OpenAI, Google, Groq, Fireworks, and Cohere. Each entry tracks: capabilities (chat, reasoning, vision, agent, embedding, function-calling, long-context, code, image-gen, voice), cost (input/output USD per 1M tokens), observed p95 latency, max context, calibrated quality score, load-balancing weight, and preferred status.
+Catalog of 12 example backends across Anthropic, OpenAI, Google, Groq, Fireworks, and Cohere. Capability, price, latency, and quality fields are seeded scoring inputs, not verified current provider specifications or observed traffic.
 
 ### 2. Route Scorer
 
@@ -63,19 +47,19 @@ Three-state breaker per model — `closed`, `open`, `half-open`:
 
 - **Closed**: normal routing
 - **Open**: failures within rolling window exceeded threshold; backend skipped during routing
-- **Half-open**: cooldown elapsed; backend gets probationary requests
+- **Half-open**: cooldown elapsed; caller-reported outcomes can close or reopen the breaker
 
-Half-open semantics are correct: pre-trip failures are dropped on transition, but outcomes recorded after cooldown elapsed are kept. A failure in half-open re-opens immediately. Three successes (configurable) in half-open close the breaker.
+The state machine is covered by local unit tests. Breaker state is process-local, and the API accepts manually supplied outcomes only for known fixture models; no provider health feed is connected.
 
 ### 4. Fallback Chain
 
-Given the scored candidates, build an ordered chain to attempt:
+Given the scored candidates, build an ordered proposed chain:
 
 | Rank | Role | Selection rule |
 |---|---|---|
 | 1 | `primary` | Highest-scoring qualified backend |
 | 2 | `failover-diff-provider` | Best from a different provider (default when `requireProviderDiversity` is true) |
-| 3 | `last-resort` | Cheapest qualified candidate not yet in chain |
+| 3 | `last-resort` | Cheapest qualified candidate from another unused provider when diversity is required |
 
 Cross-provider failover is the default — falling from Claude to Claude doesn't help when Anthropic is the issue.
 
@@ -83,7 +67,7 @@ Cross-provider failover is the default — falling from Claude to Claude doesn't
 
 Aggregates routing decisions over a window into: total decisions, unique tenants, unique models selected, fallback usage rate, top models by selection share, top tenants, optimization mix, p50/p95 cost + latency, total spend, average qualified-candidate count.
 
-The telemetry is what tells you "we routed 73% of traffic to Sonnet 4.6, fellbacks fired 4.8% of the time, and tenant_acme is driving 42% of premium model usage." That's how you tune the policy without guesswork.
+The included telemetry is synthetic and does not update when `/api/route/decide` is called.
 
 ## API Endpoints
 
@@ -92,7 +76,7 @@ The telemetry is what tells you "we routed 73% of traffic to Sonnet 4.6, fellbac
 | Method | Endpoint | Purpose |
 |---|---|---|
 | POST | `/api/route/score` | Score all backends against a routing request; return ranked candidates |
-| POST | `/api/route/decide` | Return selected backend + fallback chain for execution |
+| POST | `/api/route/decide` | Return selected backend + proposed fallback chain; no provider call |
 
 ### Models
 
@@ -120,54 +104,17 @@ The telemetry is what tells you "we routed 73% of traffic to Sonnet 4.6, fellbac
 
 ## Sample: Route Decision
 
-```json
-POST /api/route/decide
-{
-  "request": {
-    "requiredCapabilities": ["chat", "function-calling"],
-    "estimatedInputTokens": 8000,
-    "estimatedOutputTokens": 1500,
-    "optimization": "balanced",
-    "maxLatencyMs": 1500,
-    "minQualityScore": 80
-  },
-  "maxChainLength": 3,
-  "requireProviderDiversity": true
-}
+```bash
+curl -X POST http://127.0.0.1:3000/api/route/decide -H "Content-Type: application/json" -d '{"request":{"requiredCapabilities":["chat","function-calling"],"estimatedInputTokens":8000,"estimatedOutputTokens":1500,"optimization":"balanced","maxLatencyMs":1500,"minQualityScore":80},"maxChainLength":3,"requireProviderDiversity":true}'
 ```
 
-```json
-{
-  "selected": {
-    "backend": { "modelId": "claude-sonnet-4.6", "provider": "Anthropic", "qualityScore": 88 },
-    "score": 81.4,
-    "estimatedCostUsd": 0.0465,
-    "estimatedLatencyMs": 1400,
-    "rationale": [
-      "Supports all 2 required capability/-ies.",
-      "Quality 88 weighted at 40%.",
-      "Cost $0.04650 weighted at 30%.",
-      "Latency p95 1400ms weighted at 30%.",
-      "Preferred backend bonus applied."
-    ]
-  },
-  "fallbackChain": {
-    "primary": "claude-sonnet-4.6",
-    "attempts": [
-      { "rank": 1, "modelId": "claude-sonnet-4.6", "provider": "Anthropic", "role": "primary" },
-      { "rank": 2, "modelId": "gpt-5-mini", "provider": "OpenAI", "role": "failover-diff-provider" },
-      { "rank": 3, "modelId": "gemini-2.5-flash", "provider": "Google", "role": "last-resort" }
-    ],
-    "totalAttempts": 3
-  },
-  "qualifiedCandidates": 5,
-  "totalCandidates": 12
-}
-```
+The response contains the selected seeded backend, scored candidates, and a proposed fallback chain. It does not send a prompt to any provider or record a real outcome.
 
-## Operator Console Preview
+## Local API Screenshot
 
-![Agent Router dashboard — model registry, circuit breakers, telemetry](docs/hero.png)
+![Agent Router local demo showing a seeded model catalog and a fallback decision returned by the running API](docs/hero.png)
+
+Captured from `http://127.0.0.1:3000/demo/runtime.html`. The page calls `/api/dashboard/summary` and `/api/route/decide` against the local fixture server; its values are synthetic. Source: `dashboard-preview/runtime.html` and `dashboard-preview/runtime.js`.
 
 ## Getting Started
 
@@ -181,15 +128,15 @@ POST /api/route/decide
 ```bash
 git clone https://github.com/mizcausevic-dev/agent-router.git
 cd agent-router
-npm install
+npm ci
 npm run dev
 ```
 
 Visit:
 
-- `http://localhost:3000/health`
-- `http://localhost:3000/api/dashboard/summary`
-- `http://localhost:3000/api/models`
+- `http://127.0.0.1:3000/demo/runtime.html`
+- `http://127.0.0.1:3000/api/dashboard/summary`
+- `http://127.0.0.1:3000/api/models`
 
 ### Run Tests
 
@@ -197,16 +144,16 @@ Visit:
 npm test
 ```
 
-29 unit tests across route scoring (13), circuit breaker state machine (8), fallback chain construction (5), and telemetry aggregation (3).
+Run the tests and build before using the decision simulator; the suite covers scoring, fallback diversity, breaker state, and API input handling.
 
 ## What This Demonstrates
 
-- Production routing logic as testable backend code — not config-as-magic
-- Proper circuit-breaker state machine with half-open semantics that actually work
-- Cross-provider failover by default (the failure-case design that matters most)
+- Routing-decision logic as testable backend code
+- Process-local circuit-breaker state transitions
+- Cross-provider failover by default
 - Optimization weights as explicit policy, not implicit heuristic
 - Capability-tagged model catalog as the foundation for everything else
-- Strict-mode TypeScript with full test coverage; CI matrix on Node 20 + 22
+- Strict-mode TypeScript with focused tests and a CI matrix on Node 20 + 22
 
 ## Future Enhancements
 
@@ -220,7 +167,7 @@ npm test
 ## Tech Stack
 
 - Node.js, TypeScript, Express, Zod
-- Helmet, CORS, Morgan
+- Helmet, Morgan
 - Node test runner
 
 ## Portfolio Links

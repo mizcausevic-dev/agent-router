@@ -115,6 +115,15 @@ test('fallback-chain: cross-provider failover preferred', () => {
   }
 });
 
+test('fallback-chain: provider diversity applies to every attempt', () => {
+  const r = scoreRoutes({
+    requiredCapabilities: ['chat'], estimatedInputTokens: 1000,
+    estimatedOutputTokens: 500, optimization: 'balanced',
+  }, MODEL_REGISTRY);
+  const chain = buildFallbackChain(r.candidates, { maxChainLength: 5, requireProviderDiversity: true });
+  assert.equal(new Set(chain.attempts.map((attempt) => attempt.provider)).size, chain.attempts.length);
+});
+
 test('fallback-chain: respects maxChainLength', () => {
   const r = scoreRoutes({
     requiredCapabilities: ['chat'],
