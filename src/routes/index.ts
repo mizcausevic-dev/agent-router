@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { assertLocalDemoMode } from '../config/env';
 import {
   RoutingRequestSchema,
   RouteWithFallbackSchema,
@@ -12,6 +13,8 @@ import { CircuitBreakerRegistry } from '../governance/circuit-breaker';
 import { recordKnownModelOutcome } from '../governance/record-outcome';
 import { summarizeTelemetry } from '../governance/telemetry';
 import { ROUTING_DECISIONS } from '../data/decisions';
+
+assertLocalDemoMode();
 
 // Process-wide circuit breaker registry. In production this would be a
 // shared store backed by Redis/etc; in-memory is fine for the demo router.

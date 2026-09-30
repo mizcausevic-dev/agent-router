@@ -7,7 +7,7 @@
 
 Local routing decision simulator for LLM workloads. It scores a seeded model catalog, builds fallback order, and tracks a process-local circuit breaker.
 
-**Release boundary:** no provider dispatch, real traffic telemetry, sticky sessions, authentication, or tenant isolation exists. The demo binds to `127.0.0.1`; `NODE_ENV=production` refuses to start. Do not route production prompts through it.
+**Release boundary:** no provider dispatch, real traffic telemetry, sticky sessions, authentication, or tenant isolation exists. The demo binds to `127.0.0.1`; `NODE_ENV=production` refuses to initialize, including when an adapter imports its app or route module. Do not route production prompts through it.
 
 ## Why This Exists
 

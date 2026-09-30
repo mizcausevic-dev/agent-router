@@ -2,7 +2,7 @@ import express from 'express';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import path from 'node:path';
-import { env } from './config/env';
+import { assertLocalDemoMode, env } from './config/env';
 import {
   modelsRouter,
   routeRouter,
@@ -10,6 +10,8 @@ import {
   telemetryRouter,
   dashboardRouter,
 } from './routes/index';
+
+assertLocalDemoMode();
 
 export const app = express();
 const startedAt = Date.now();
@@ -37,12 +39,7 @@ if (env.nodeEnv !== 'production') app.use('/demo', express.static(path.join(__di
 app.use((_req, res) => { res.status(404).json({ error: 'Not found' }); });
 
 if (require.main === module) {
-  if (env.nodeEnv === 'production') {
-    console.error('[agent-router] production start disabled: this fixture API has no authentication or provider dispatch.');
-    process.exitCode = 1;
-  } else {
-    app.listen(env.port, '127.0.0.1', () => {
-      console.log(`agent-router demo listening on 127.0.0.1:${env.port}`);
-    });
-  }
+  app.listen(env.port, '127.0.0.1', () => {
+    console.log(`agent-router demo listening on 127.0.0.1:${env.port}`);
+  });
 }
