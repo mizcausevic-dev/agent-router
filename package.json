@@ -9,12 +9,21 @@
     "start": "node dist/index.js",
     "test": "node --require ts-node/register --test tests/*.test.ts"
   },
-  "engines": { "node": ">=20" },
-  "keywords": ["llm-router", "agent-router", "model-routing", "ai-platform", "fallback-chain", "circuit-breaker", "platform-engineering"],
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "llm-router",
+    "agent-router",
+    "model-routing",
+    "ai-platform",
+    "fallback-chain",
+    "circuit-breaker",
+    "platform-engineering"
+  ],
   "author": "Mirza Causevic <miz@kineticgain.dev>",
   "license": "MIT",
   "dependencies": {
-    "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^5.0.1",
     "helmet": "^8.0.0",
@@ -23,7 +32,6 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
     "@types/morgan": "^1.9.9",
     "@types/node": "^22.7.5",
@@ -32,5 +40,6 @@
     "supertest": "^7.0.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.6.3"
-  }
+  },
+  "private": true
 }

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Agent Router | Local fixture evidence</title>
+  <link rel="stylesheet" href="/demo/runtime.css">
+  <script defer src="/demo/runtime-ui.js"></script>
+  <script defer src="/demo/runtime.js"></script>
+</head>
+<body data-app="router">
+  <div class="shell">
+    <header class="masthead">
+      <div class="brand"><span class="mark" aria-hidden="true">AR</span><div><p class="kicker">LOCAL API EVIDENCE / 02</p><h1>Agent Router</h1></div></div>
+      <p class="state" id="state" role="status">Loading local fixture responses…</p>
+    </header>
+    <main>
+      <section class="intro" aria-labelledby="intro-title">
+        <p class="kicker">Synthetic catalog · actual API response</p>
+        <h2 id="intro-title">Show the decision, then the fallback.</h2>
+        <p>This page calls the local scoring API. Model prices, latency, and telemetry are seeded examples; the service does not dispatch prompts to providers.</p>
+      </section>
+      <section class="metrics" id="metrics" aria-label="Fixture summary"></section>
+      <div class="panels">
+        <section class="panel" aria-labelledby="primary-title"><div class="panel-head"><p class="kicker">CATALOG / GET /api/models</p><h3 id="primary-title">Candidate backends</h3></div><div class="table-wrap"><table><thead><tr id="primary-head"></tr></thead><tbody id="primary-rows"></tbody></table></div></section>
+        <section class="panel" aria-labelledby="secondary-title"><div class="panel-head"><p class="kicker">DECISION / POST /api/route/decide</p><h3 id="secondary-title">Fallback simulation</h3></div><div class="stack" id="secondary"></div></section>
+      </div>
+    </main>
+    <footer>LOCAL FIXTURE MODE · no provider calls, authentication, or production routing · <a href="/api/models">Catalog response</a></footer>
+  </div>
+</body>
+</html>

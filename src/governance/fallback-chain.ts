@@ -83,7 +83,7 @@ export function buildFallbackChain(
   if (chain.length < maxLen) {
     const inChainIds = new Set(chain.map((c) => c.modelId));
     const cheapest = [...qualified]
-      .filter((c) => !inChainIds.has(c.backend.modelId))
+      .filter((c) => !inChainIds.has(c.backend.modelId) && (!requireDiversity || !usedProviders.has(c.backend.provider)))
       .sort((a, b) => a.estimatedCostUsd - b.estimatedCostUsd)[0];
     if (cheapest) {
       chain.push({
